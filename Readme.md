@@ -3,5 +3,5 @@
 ## Dot
 
 ```plain
-1. ^ Allow [License](License)
+1. ^ Allow [License.docx](License.docx)
 ```
