@@ -60,7 +60,7 @@ App.registerModel('UserModel', UserModel);
 <head>
     <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
     <style>
-        [data-id] { margin: 5px; padding: 5px; }
+        [data-id] { padding: 5px; }
         .container { border: 1px solid #ccc; padding: 20px; max-width: 500px; }
         .error { color: red; display: none; }
     </style>
@@ -70,7 +70,7 @@ App.registerModel('UserModel', UserModel);
     <div class="container" data-component="userForm" data-model="UserModel">
         <input type="text" placeholder="Enter username" data-id="username" data-bind="model.username">
         <button data-id="submitBtn" data-event="click:handleSubmit">Submit</button>
-        <div data-id="usernameError" class="error"></div>
+        <div class="error" data-id="usernameError"></div>
         <div data-id="output"></div>
     </div>
 
@@ -91,7 +91,7 @@ App.registerModel('UserModel', UserModel);
             this.listeners = [];
         }
 
-        get data() {
+        getData() {
             return this._data;
         }
 
