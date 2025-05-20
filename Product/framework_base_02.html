@@ -38,17 +38,21 @@
 <head>
     <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
     <style>
+        * { font: 9pt SimSun }
         [data-id] { padding: 5px; }
         .container { border: 1px solid #ccc; padding: 20px; max-width: 500px; }
-        .error { color: red; display: none; }
+        .display-none { display: none; }
+        .display-block { display: block; }
+        .error { color: red; }
     </style>
 </head>
+
 <body>
     <div class="container">
         <!-- 组件1 -->
         <div data-component="userForm" data-model="UserModel">
             <input type="text" placeholder="Enter username" data-bind="userName">
-            <button data-id="submitBtn" data-event="click:handleSubmit">Submit</button>
+            <button data-event="click:handleSubmit">Submit</button>
             <div class="error" data-id="usernameError"></div>
         </div>
         <!-- 组件2 -->
@@ -60,6 +64,30 @@
     </div>
 
     <script>
+    // ====================================
+    // 基本核心 - 通用工具
+    // ====================================
+    Date.prototype.format = function(fmt) {
+        var formats = {
+            "q+" : Math.floor((this.getMonth()+3)/3), //季
+            "M+" : this.getMonth()+1,                 //月
+            "d+" : this.getDate(),                    //日
+            "h+" : this.getHours(),                   //时
+            "m+" : this.getMinutes(),                 //分
+            "s+" : this.getSeconds(),                 //秒
+            "S"  : this.getMilliseconds(),            //毫秒
+        };
+        if(/(y+)/.test(fmt)) {
+                fmt = fmt.replace(RegExp.$1, (this.getFullYear()+"").substr(4 - RegExp.$1.length));
+        }
+        for(var format in formats) {
+            if(new RegExp("("+ format +")").test(fmt)){
+                fmt = fmt.replace(RegExp.$1, (RegExp.$1.length==1) ? (formats[format]) : (("00"+ formats[format]).substr((""+ formats[format]).length)));
+            }
+        }
+        return fmt;
+    }
+
     // ====================================
     // 装饰器翻译系统 - 依赖注入
     // ====================================
@@ -235,12 +263,16 @@
         }
 
         showError(message) {
-            this.elements.usernameError.style.display = 'block';
-            this.elements.usernameError.textContent = message;
+            const usernameError = this.elements.usernameError;
+            usernameError.classList.remove('display-none');
+            usernameError.classList.add('display-block');
+            usernameError.innerHTML = message;
         }
 
         hideError() {
-            this.elements.usernameError.style.display = 'none';
+            const usernameError = this.elements.usernameError;
+            usernameError.classList.remove('display-block');
+            usernameError.classList.add('display-none');
         }
     }
 
@@ -263,7 +295,7 @@
         handleSubmit() {
             try {
                 const userName = this.model.data.userName;
-                const userDate = new Date().toLocaleString();
+                const userDate = new Date().format("yyyy-MM-dd hh:mm:ss");
 
                 this.model.validateUsername(userName);
                 this.view.hideError();
@@ -289,7 +321,7 @@
         handleSave() {
             try {
                 const productName = this.model.data.productName;
-                const productDate = new Date().toLocaleString();
+                const productDate = new Date().format("yyyy-MM-dd hh:mm:ss");
 
                 // 使用全局元素输出信息
                 this.view.elements.output.innerHTML = `
