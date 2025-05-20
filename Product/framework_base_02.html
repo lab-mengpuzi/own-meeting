@@ -4,33 +4,33 @@
 主要改进点说明：
 
 1. 装饰器翻译系统
-- 通过 `registerServices` 实现 装饰器工厂清单
-- 通过 `registerService` 实现 装饰器工厂方法
-- 通过 `withDecorators` 实现 装饰器工厂流水线
-- 服务间支持自动依赖解析（如UserService自动获取StorageService）
-- Presenter构造函数自动注入已注册服务
+- 通过 `withDecorators` 实现 装饰器基本服务工厂流水线
+- 通过 `registerServices` 实现 装饰器基本服务工厂清单
+- 通过 `registerModels` 实现 装饰器模型服务工厂清单
+- 通过 `registerService` 实现 装饰器基本服务工厂方法
+- 通过 `registerModelService` 实现 装饰器模型服务工厂方法
+- Presenter 构造函数自动注入已注册服务
 
 2. 服务整合
-- StorageService提供本地存储功能
-- UserService处理用户相关业务逻辑
+- StorageService 提供本地存储功能
 - 服务实例在应用启动前自动初始化
 
 3. Presenter增强
-- 同时支持原有MVP参数(view/model)和依赖注入
+- 同时支持原有 MVP 参数 (view/model) 和依赖注入
 - 业务方法中可直接使用注入的服务
 - 保持原有事件处理逻辑不变
 
 4. 数据持久化示例
-- 用户提交时自动保存到localStorage
+- 用户提交时自动保存到 localStorage
 - 商品保存时记录时间戳
-- 可通过StorageService扩展更多存储方式
+- 可通过 StorageService 扩展更多存储方式
 
 使用示例：
 1. 提交用户表单后可在控制台查看存储结果
-2. 保存商品后可在localStorage查看"lastProduct"数据
+2. 保存商品后可在localStorage查看 product 数据
 3. 所有服务依赖自动解析，无需手动实例化
 
-该实现保持了MVP模式的核心优势，同时增加了现代化的依赖注入和服务管理能力，适合需要扩展复杂业务逻辑的中大型应用。
+该实现保持了 MVP 设计模式的核心优势，同时增加了现代化的依赖注入和服务管理能力。
 -->
 
 <!DOCTYPE html>
@@ -44,97 +44,170 @@
     </style>
 </head>
 <body>
-    <!-- 组件1 -->
-    <div class="container" data-component="userForm" data-model="UserModel">
-        <input type="text" placeholder="Enter username" data-id="username" data-bind="model.username">
-        <button data-id="submitBtn" data-event="click:handleSubmit">Submit</button>
-        <div class="error" data-id="usernameError"></div>
-        <div data-id="output"></div>
-    </div>
-
-    <!-- 组件2 -->
-    <div class="container" data-component="productForm" data-model="ProductModel">
-        <input type="text" placeholder="Enter productName" data-id="productName" data-bind="model.name">
-        <button data-event="click:handleSave">Save Product</button>
+    <div class="container">
+        <!-- 组件1 -->
+        <div data-component="userForm" data-model="UserModel">
+            <input type="text" placeholder="Enter username" data-bind="userName">
+            <button data-id="submitBtn" data-event="click:handleSubmit">Submit</button>
+            <div class="error" data-id="usernameError"></div>
+        </div>
+        <!-- 组件2 -->
+        <div data-component="productForm" data-model="ProductModel">
+            <input type="text" placeholder="Enter productName" data-bind="productName">
+            <button data-event="click:handleSave">Save Product</button>
+        </div>
+        <div data-global="output"></div>
     </div>
 
     <script>
     // ====================================
-    // Model 类 - 数据管理
-    // 基础模型类
+    // 装饰器翻译系统 - 依赖注入
     // ====================================
-    class Model {
-        constructor() {
-            this._data = {};
-            this.listeners = [];
-        }
+    // 装饰器基本服务工厂清单
+    const registerServices = new Map();
+    // 装饰器模型服务工厂清单
+    const registerModels = new Map();
 
-        getData() {
-            return this._data;
-        }
-
-        setData(key, value) {
-            this._data[key] = value;
-            this.notify(key);
-        }
-
-        subscribe(callback) {
-            this.listeners.push(callback);
-        }
-
-        notify(key) {
-            this.listeners.forEach(cb => cb(key));
-        }
+    // 装饰器基本服务工厂方法
+    function registerService(serviceName) {
+        return function(target) {
+            registerServices.set(serviceName, new target());
+            target.prototype.__serviceName = serviceName;
+            return target;
+        };
     }
+
+    // 装饰器模型服务工厂方法
+    function registerModelService(modelName) {
+        return function(targetClass) {
+            // 注册到全局作用域
+            window[modelName] = targetClass;
+
+            // 注册到模型注册表
+            registerModels.set(modelName, targetClass);
+            return targetClass;
+        };
+    }
+
+    // 装饰器基本服务工厂流水线
+    function withDecorators(...decorators) {
+        return function(target) {
+            return decorators.reduceRight((acc, decorator) => {
+                return decorator(acc);
+            }, target);
+        };
+    }
+
+    // ====================================
+    // 装饰器翻译系统 - 服务定义
+    // ====================================
+    const StorageService = withDecorators(
+        registerService('storageService')
+    )(
+        class {
+            save(key, value) {
+                localStorage.setItem(key, JSON.stringify(value));
+            }
+            load(key) {
+                return JSON.parse(localStorage.getItem(key));
+            }
+        }
+    );
+
+    // ====================================
+    // Model - 数据管理
+    // ====================================
+    // 基础模型
+    const Model = withDecorators(
+        registerModelService('Model')
+    )(
+        class {
+            constructor() {
+                this._data = {};
+                this.listeners = [];
+            }
+
+            // getter 方法 允许 get -> Model.data
+            get data() {
+                return this._data;
+            }
+
+            // setter 普通 方法 允许 set -> Model.data 传递 >= 2 个 参数 否则 为 1 个 参数
+            setData(key, value) {
+                this._data[key] = value;
+                this.notify(key);
+            }
+
+            subscribe(callback) {
+                this.listeners.push(callback);
+            }
+
+            notify(key) {
+                this.listeners.forEach(cb => cb(key));
+            }
+        }
+    );
 
     // 用户模型
-    class UserModel extends Model {
-        constructor() {
-            super();
-            this.setData('username', '');
-        }
+    const UserModel = withDecorators(
+        registerModelService('UserModel')
+    )(
+        class extends Model {
+            constructor() {
+                super();
+                this.setData('userName', '');
+            }
 
-        validateUsername(value) {
-            if (value.length < 3) throw new Error("用户名至少3个字符");
+            validateUsername(value) {
+                if (value.length < 3) throw new Error("用户名至少3个字符");
+            }
         }
-    }
+    );
 
     // 商品模型
-    class ProductModel extends Model {
-        constructor() {
-            super();
-            this.setData('name', '');
+    const ProductModel = withDecorators(
+        registerModelService('ProductModel')
+    )(
+        class extends Model {
+            constructor() {
+                super();
+                this.setData('productName', '');
+            }
         }
-    }
+    );
 
     // ====================================
-    // View 类 - UI管理
+    // View - UI管理
     // ====================================
     class View {
         constructor(dataComponent) {
             this.component = document.querySelector(`[data-component="${dataComponent}"]`);
             this.elements = {};
-            this.bindings = {};
+            this.binds = {};
 
             // 自动发现元素
             this.component.querySelectorAll('[data-id]').forEach(el => {
                 this.elements[el.dataset.id] = el;
             });
 
+            // 自动发现全局元素
+            document.querySelectorAll('[data-global]').forEach(el => {
+                this.elements[el.dataset.global] = el;
+            });
+
             // 处理数据绑定
             this.component.querySelectorAll('[data-bind]').forEach(el => {
-                const binding = el.dataset.bind;
-                const [_, prop] = binding.split('.');
+                const bind = el.dataset.bind;
 
-                if (!this.bindings[prop]) this.bindings[prop] = [];
-                this.bindings[prop].push(el);
+                if (!this.binds[bind]) this.binds[bind] = [];
+                this.binds[bind].push(el);
 
                 // 初始化值
-                el.value = this.presenter?.model.data[prop] || '';
+                el.value = this.presenter?.model.data[bind] || '';
 
                 // 双向绑定
                 el.addEventListener('input', (e) => {
-                    this.presenter.model.setData(prop, e.target.value);
+                    this.presenter.model.setData(bind, e.target.value);
                 });
             });
 
@@ -154,13 +227,9 @@
             this.presenter.model.subscribe((key) => this.updateBindings(key));
         }
 
-        updateOutput(text) {
-            this.elements.output.textContent = text;
-        }
-
         updateBindings(key) {
             const value = this.presenter.model.data[key];
-            this.bindings[key]?.forEach(el => {
+            this.binds[key]?.forEach(el => {
                 el.value = value;
             });
         }
@@ -176,60 +245,7 @@
     }
 
     // ====================================
-    // 装饰器翻译系统 依赖注入
-    // ====================================
-    // 装饰器工厂清单
-    const registerServices = new Map();
-
-    // 装饰器工厂方法
-    function registerService(serviceName) {
-        return function(target) {
-            registerServices.set(serviceName, new target());
-            target.prototype.__serviceName = serviceName;
-            return target;
-        };
-    }
-
-    // 装饰器工厂流水线
-    function withDecorators(...decorators) {
-        return function(target) {
-            return decorators.reduceRight((acc, decorator) => {
-                return decorator(acc);
-            }, target);
-        };
-    }
-
-    // ====================================
-    // 装饰器翻译系统 服务定义
-    // ====================================
-    const StorageService = withDecorators(
-        registerService('storageService')
-    )(
-        class {
-            save(key, value) {
-                localStorage.setItem(key, JSON.stringify(value));
-            }
-            load(key) {
-                return JSON.parse(localStorage.getItem(key));
-            }
-        }
-    );
-
-    const UserService = withDecorators(
-        registerService('userService')
-    )(
-        class {
-            constructor() {
-                this.storage = registerServices.get('storageService');
-            }
-            saveUser(user) {
-                this.storage.save('currentUser', user);
-            }
-        }
-    );
-
-    // ====================================
-    // Presenter 类 - 业务逻辑
+    // Presenter - 逻辑协调
     // ====================================
     class Presenter {
         constructor(view, model) {
@@ -246,15 +262,23 @@
 
         handleSubmit() {
             try {
-                this.model.validateUsername(this.model.data.username);
-                this.view.updateOutput(`欢迎, ${this.model.data.username}!`);
+                const userName = this.model.data.userName;
+                const userDate = new Date().toLocaleString();
+
+                this.model.validateUsername(userName);
                 this.view.hideError();
-                
-                // 使用注入的服务保存用户
-                if (this.userService) {
-                    this.userService.saveUser({
-                        username: this.model.data.username,
-                        timestamp: new Date()
+
+                // 使用全局元素输出信息
+                this.view.elements.output.innerHTML = `
+用户名称 ${userName}<br/>
+用户日期 ${userDate}
+                `;
+
+                // 使用存储服务保存用户
+                if (this.storageService) {
+                    this.storageService.save('user', {
+                        'userName' : userName,
+                        'userDate' : userDate,
                     });
                 }
             } catch (error) {
@@ -263,13 +287,25 @@
         }
 
         handleSave() {
-            console.log('保存商品: ', this.model.data.name);
-            // 使用存储服务保存商品
-            if (this.storageService) {
-                this.storageService.save('lastProduct', {
-                    name: this.model.data.name,
-                    savedAt: new Date().toISOString()
-                });
+            try {
+                const productName = this.model.data.productName;
+                const productDate = new Date().toLocaleString();
+
+                // 使用全局元素输出信息
+                this.view.elements.output.innerHTML = `
+商品名称 ${productName}<br/>
+商品日期 ${productDate}
+                `;
+
+                // 使用存储服务保存商品
+                if (this.storageService) {
+                    this.storageService.save('product', {
+                        'productName' : productName,
+                        'productDate' : productDate,
+                    });
+                }
+            } catch (error) {
+                this.view.showError(error.message);
             }
         }
     }
@@ -278,32 +314,29 @@
     // 组件初始化系统
     // ====================================
     class App {
-        static dataComponents = {};
-
-        static registerModel(name, modelClass) {
-            this.dataComponents[name] = modelClass;
-        }
-
         static init() {
             document.querySelectorAll('[data-component]').forEach(dataComponent => {
+                const componentName = dataComponent.dataset.component;
                 const modelName = dataComponent.dataset.model;
-                const modelClass = this.dataComponents[modelName];
 
-                if (!modelClass) throw new Error(`未注册的模型: ${modelName}`);
+                // 从模型注册表获取（确保名称匹配）
+                const modelClass = registerModels.get(modelName);
+                if (!modelClass) {
+                    throw new Error(`未注册模型类 (请检查 registerModel 装饰器参数) ${modelName}`);
+                }
 
+                // 初始化组件
                 const model = new modelClass();
-                const view = new View(dataComponent.dataset.component);
+                const view = new View(componentName);
                 new Presenter(view, model);
             });
         }
     }
 
-    // 注册模型
-    App.registerModel('UserModel', UserModel);
-    App.registerModel('ProductModel', ProductModel);
-
     // 启动应用
-    document.addEventListener('DOMContentLoaded', () => App.init());
+    document.addEventListener('DOMContentLoaded', () => {
+        App.init();
+    });
     </script>
 </body>
 </html>
