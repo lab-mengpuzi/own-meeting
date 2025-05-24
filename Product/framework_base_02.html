@@ -15,7 +15,7 @@
 - StorageService 提供本地存储功能
 - 服务实例在应用启动前自动初始化
 
-3. Presenter增强
+3. Presenter 增强
 - 同时支持原有 MVP 参数 (view/model) 和依赖注入
 - 业务方法中可直接使用注入的服务
 - 保持原有事件处理逻辑不变
@@ -51,9 +51,9 @@
     <div class="container">
         <!-- 组件1 -->
         <div data-component="userForm" data-model="UserModel">
-            <input type="text" placeholder="Enter username" data-bind="userName">
+            <input type="text" placeholder="Enter userName" data-bind="userName">
             <button data-event="click:handleSubmit">Submit</button>
-            <div class="error" data-id="usernameError"></div>
+            <div class="error" data-id="userNameError"></div>
         </div>
         <!-- 组件2 -->
         <div data-component="productForm" data-model="ProductModel">
@@ -108,10 +108,10 @@
     // 装饰器模型服务工厂方法
     function registerModelService(modelName) {
         return function(targetClass) {
-            // 注册到全局作用域
+            // 记录 to window
             window[modelName] = targetClass;
 
-            // 注册到模型注册表
+            // 记录 to 装饰器模型服务工厂清单
             registerModels.set(modelName, targetClass);
             return targetClass;
         };
@@ -155,12 +155,13 @@
                 this.listeners = [];
             }
 
-            // getter 方法 允许 get -> Model.data
+            // get 方法 允许 get -> function(){ return; }
             get data() {
                 return this._data;
             }
 
-            // setter 普通 方法 允许 set -> Model.data 传递 >= 2 个 参数 否则 为 1 个 参数
+            // setter 方法 允许 传递 >= 2 参数 set -> function(){}
+            // set 方法 允许 传递 = 1 参数 set -> function(){}
             setData(key, value) {
                 this._data[key] = value;
                 this.notify(key);
@@ -239,7 +240,7 @@
                 });
             });
 
-            // 处理事件绑定
+            // 处理事件
             this.component.querySelectorAll('[data-event]').forEach(el => {
                 const [eventType, handler] = el.dataset.event.split(':');
                 el.addEventListener(eventType, () => {
@@ -263,16 +264,16 @@
         }
 
         showError(message) {
-            const usernameError = this.elements.usernameError;
-            usernameError.classList.remove('display-none');
-            usernameError.classList.add('display-block');
-            usernameError.innerHTML = message;
+            const userNameError = this.elements.userNameError;
+            userNameError.classList.remove('display-none');
+            userNameError.classList.add('display-block');
+            userNameError.innerHTML = message;
         }
 
         hideError() {
-            const usernameError = this.elements.usernameError;
-            usernameError.classList.remove('display-block');
-            usernameError.classList.add('display-none');
+            const userNameError = this.elements.userNameError;
+            userNameError.classList.remove('display-block');
+            userNameError.classList.add('display-none');
         }
     }
 
@@ -351,7 +352,7 @@
                 const componentName = dataComponent.dataset.component;
                 const modelName = dataComponent.dataset.model;
 
-                // 从模型注册表获取（确保名称匹配）
+                // 获取 装饰器模型服务工厂清单 -> 模型（确保名称匹配）
                 const modelClass = registerModels.get(modelName);
                 if (!modelClass) {
                     throw new Error(`未注册模型类 (请检查 registerModel 装饰器参数) ${modelName}`);
@@ -365,7 +366,7 @@
         }
     }
 
-    // 启动应用
+    // 启动程序
     document.addEventListener('DOMContentLoaded', () => {
         App.init();
     });
